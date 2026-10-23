@@ -1,10 +1,11 @@
-import json
 import os
 import sys
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import requests
+
+from ff_state import load_state as load_db_state, save_state as save_db_state
 
 FEED = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 WEBHOOK = os.environ["DISCORD_WEBHOOK_URL"]
@@ -13,7 +14,7 @@ PING = os.environ.get("ALERT_PING", "")  # e.g. "@here" or "<@&ROLE_ID>"; used f
 
 TZ = ZoneInfo("Asia/Kolkata")
 FF_TZ = ZoneInfo("America/New_York")  # the feed's native timezone
-STATE_FILE = "state.json"
+JOB_NAME = "ff_alerts"
 
 MIN_AHEAD = 2    # minutes
 MAX_AHEAD = 15   # minutes
@@ -24,16 +25,11 @@ COLOR = {"High": 0xE74C3C, "Medium": 0xE67E22}
 
 
 def load_state():
-    try:
-        with open(STATE_FILE) as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {"sent": {}, "feed": [], "feed_fetched": None}
+    return load_db_state(JOB_NAME, {"sent": {}, "feed": [], "feed_fetched": None})
 
 
 def save_state(state):
-    with open(STATE_FILE, "w") as f:
-        json.dump(state, f)
+    save_db_state(JOB_NAME, state)
 
 
 def get_feed(state, now):

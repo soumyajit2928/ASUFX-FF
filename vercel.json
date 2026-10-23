@@ -1,0 +1,12 @@
+{
+  "functions": {
+    "api/*.py": {
+      "runtime": "python3.11"
+    }
+  },
+  "crons": [
+    { "path": "/api/alerts", "schedule": "*/5 * * * 1-5" },
+    { "path": "/api/calendar?mode=today", "schedule": "30 0 * * 1-5" },
+    { "path": "/api/calendar?mode=week", "schedule": "30 1 * * 0" }
+  ]
+}
