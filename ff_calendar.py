@@ -11,7 +11,6 @@ MODE = os.environ.get("MODE", "today")  # "today" or "week"
 
 IMPACTS = {
     "High":   {"label": "🔴 Red Folder (High Impact)",     "color": 0xE74C3C},
-    "Medium": {"label": "🟠 Orange Folder (Medium Impact)", "color": 0xE67E22},
 }
 
 
