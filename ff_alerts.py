@@ -19,8 +19,8 @@ MIN_AHEAD = 2    # minutes
 MAX_AHEAD = 15   # minutes
 FEED_MAX_AGE_HOURS = 6
 
-ICON = {"High": "🔴", "Medium": "🟠"}
-COLOR = {"High": 0xE74C3C, "Medium": 0xE67E22}
+ICON = {"High": "🔴", "Medium": "🟠", "Low": "🟡"}
+COLOR = {"High": 0xE74C3C, "Medium": 0xE67E22, "Low": 0xF1C40F}
 
 
 def load_state():
@@ -99,7 +99,10 @@ def main():
     for dt in sorted(groups):
         items = groups[dt]
         mins = round(min(m for m, _ in items))
-        top = "High" if any(e["impact"] == "High" for _, e in items) else "Medium"
+        top = next(
+            (lvl for lvl in ("High", "Medium", "Low") if any(e["impact"] == lvl for _, e in items)),
+            "Low",
+        )
         has_high = has_high or top == "High"
         lines = []
         for _, e in items:
