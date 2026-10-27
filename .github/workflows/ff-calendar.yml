@@ -1,28 +1,22 @@
-name: Forex Factory Red Folder News
+name: FF Calendar
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: "0 * * * *"
+    - cron: "30 0 * * 1-5"   # 6:00 AM IST, Mon-Fri (daily "today" digest)
+    - cron: "30 1 * * 0"     # 7:00 AM IST Sunday (weekly preview)
+  workflow_dispatch:
 
 jobs:
-  send-calendar:
+  post:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-
-      - name: Install dependencies
-        run: pip install requests
-
-      - name: Send high-impact news
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          MODE: week
+          MODE: ${{ github.event.schedule == '30 1 * * 0' && 'week' || 'today' }}
         run: python ff_calendar.py
