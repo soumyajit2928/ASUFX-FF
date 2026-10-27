@@ -9,9 +9,11 @@ WEBHOOK = os.environ["DISCORD_WEBHOOK_URL"]
 TZ = ZoneInfo("Asia/Kolkata")
 MODE = os.environ.get("MODE", "today")  # "today" or "week"
 
+# Only these currencies are posted (the feed's "country" field is the currency code)
+CURRENCIES = {"AUD", "USD", "CAD", "CHF", "JPY", "EUR", "GBP", "NZD"}
+
 IMPACTS = {
     "High":   {"label": "🔴 Red Folder (High Impact)",     "color": 0xE74C3C},
-    "Medium": {"label": "🟠 Orange Folder (Medium Impact)", "color": 0xE67E22},
 }
 
 
@@ -20,7 +22,7 @@ def fetch_events():
     r.raise_for_status()
     events = []
     for e in r.json():
-        if e.get("impact") not in IMPACTS:
+        if e.get("impact") not in IMPACTS or e.get("country") not in CURRENCIES:
             continue
         dt = datetime.fromisoformat(e["date"]).astimezone(TZ)
         events.append({**e, "dt": dt})
@@ -78,7 +80,7 @@ def main():
     when = datetime.now(TZ).strftime("%A, %d %b %Y")
     if not events:
         requests.post(
-            WEBHOOK, json={"content": f"📅 No red/orange folder news for {when}."}, timeout=20
+            WEBHOOK, json={"content": f"📅 No red folder news for {when}."}, timeout=20
         ).raise_for_status()
         return
     header = f"📅 **Forex Factory Calendar: {'Today' if MODE == 'today' else 'This Week'}** ({when})"

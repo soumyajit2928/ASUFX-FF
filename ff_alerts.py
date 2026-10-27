@@ -8,8 +8,9 @@ import requests
 
 FEED = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 WEBHOOK = os.environ["DISCORD_WEBHOOK_URL"]
-IMPACTS = [x.strip() for x in os.environ.get("ALERT_IMPACTS", "High").split(",") if x.strip()]
-PING = os.environ.get("ALERT_PING", "")  # e.g. "@here" or "<@&ROLE_ID>"; used for High impact only
+IMPACTS = ["High"]  # red folder only
+CURRENCIES = {"AUD", "USD", "CAD", "CHF", "JPY", "EUR", "GBP", "NZD"}
+PING = os.environ.get("ALERT_PING", "")  # e.g. "@here" or "<@&ROLE_ID>"
 
 TZ = ZoneInfo("Asia/Kolkata")
 FF_TZ = ZoneInfo("America/New_York")  # the feed's native timezone
@@ -19,8 +20,8 @@ MIN_AHEAD = 2    # minutes
 MAX_AHEAD = 15   # minutes
 FEED_MAX_AGE_HOURS = 6
 
-ICON = {"High": "🔴", "Medium": "🟠", "Low": "🟡"}
-COLOR = {"High": 0xE74C3C, "Medium": 0xE67E22, "Low": 0xF1C40F}
+ICON = {"High": "🔴"}
+COLOR = {"High": 0xE74C3C}
 
 
 def load_state():
@@ -74,7 +75,7 @@ def main():
 
     due = []
     for e in feed:
-        if e.get("impact") not in IMPACTS:
+        if e.get("impact") not in IMPACTS or e.get("country") not in CURRENCIES:
             continue
         dt = datetime.fromisoformat(e["date"])
         # skip "All Day" / tentative events (stored at 00:00 feed time)
@@ -99,11 +100,8 @@ def main():
     for dt in sorted(groups):
         items = groups[dt]
         mins = round(min(m for m, _ in items))
-        top = next(
-            (lvl for lvl in ("High", "Medium", "Low") if any(e["impact"] == lvl for _, e in items)),
-            "Low",
-        )
-        has_high = has_high or top == "High"
+        top = "High"
+        has_high = True
         lines = []
         for _, e in items:
             lines.append(
