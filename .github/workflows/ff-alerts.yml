@@ -27,7 +27,6 @@ jobs:
       - name: Check for upcoming news
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          ALERT_IMPACTS: "High"          # use "High,Medium" to include orange folder
           ALERT_PING: ""                 # e.g. "@here"
         run: python ff_alerts.py
 
