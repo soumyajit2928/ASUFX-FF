@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import requests
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -9,6 +10,12 @@ WEBHOOK = os.environ["DISCORD_WEBHOOK_URL"]
 TZ = ZoneInfo("Asia/Kolkata")
 MODE = os.environ.get("MODE", "today")  # "today" or "week"
 
+# Discord role to ping (numeric role ID). Leave unset for no ping.
+_role = os.environ.get("PING_ROLE_ID", "").strip()
+ROLE_ID = _role if _role.isdigit() else ""
+ROLE_MENTION = f"<@&{ROLE_ID}>" if ROLE_ID else ""
+ALLOWED_MENTIONS = {"parse": [], "roles": [ROLE_ID] if ROLE_ID else []}
+
 # Only these currencies are posted (the feed's "country" field is the currency code)
 CURRENCIES = {"AUD", "USD", "CAD", "CHF", "JPY", "EUR", "GBP", "NZD"}
 
@@ -17,19 +24,38 @@ IMPACTS = {
 }
 
 
+def fetch_json(url, attempts=4):
+    """Fetch the FF feed with retries (the feed often returns 429/5xx to shared GitHub runners)."""
+    last = None
+    for i in range(attempts):
+        try:
+            r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
+            if r.status_code == 429 or r.status_code >= 500:
+                raise RuntimeError(f"HTTP {r.status_code}")
+            r.raise_for_status()
+            return r.json()
+        except Exception as ex:
+            last = ex
+            print(f"Feed fetch attempt {i + 1}/{attempts} failed: {ex}", file=sys.stderr)
+            time.sleep(5 * (i + 1))
+    raise last
+
+
 def fetch_events():
-    r = requests.get(FEED, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
-    r.raise_for_status()
+    raw = fetch_json(FEED)
+    print(f"Feed returned {len(raw)} events total.")
     events = []
-    for e in r.json():
+    for e in raw:
         if e.get("impact") not in IMPACTS or e.get("country") not in CURRENCIES:
             continue
         dt = datetime.fromisoformat(e["date"]).astimezone(TZ)
         events.append({**e, "dt": dt})
     events.sort(key=lambda x: x["dt"])
+    print(f"{len(events)} high-impact events for the selected currencies this week.")
     if MODE == "today":
         today = datetime.now(TZ).date()
         events = [e for e in events if e["dt"].date() == today]
+        print(f"{len(events)} of them fall on today ({today}, IST).")
     return events
 
 
@@ -84,7 +110,11 @@ def main():
         ).raise_for_status()
         return
     header = f"📅 **Forex Factory Calendar: {'Today' if MODE == 'today' else 'This Week'}** ({when})"
-    requests.post(WEBHOOK, json={"content": header}, timeout=20).raise_for_status()
+    if ROLE_MENTION:
+        header = f"{ROLE_MENTION} {header}"
+    requests.post(
+        WEBHOOK, json={"content": header, "allowed_mentions": ALLOWED_MENTIONS}, timeout=20
+    ).raise_for_status()
     send(build_embeds(events))
 
 

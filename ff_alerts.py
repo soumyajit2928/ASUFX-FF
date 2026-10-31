@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -10,15 +11,19 @@ FEED = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 WEBHOOK = os.environ["DISCORD_WEBHOOK_URL"]
 IMPACTS = ["High"]  # red folder only
 CURRENCIES = {"AUD", "USD", "CAD", "CHF", "JPY", "EUR", "GBP", "NZD"}
-PING = os.environ.get("ALERT_PING", "")  # e.g. "@here" or "<@&ROLE_ID>"
+# Discord role to ping (numeric role ID). Leave unset for no ping.
+_role = os.environ.get("PING_ROLE_ID", "").strip()
+ROLE_ID = _role if _role.isdigit() else ""
+ROLE_MENTION = f"<@&{ROLE_ID}>" if ROLE_ID else ""
+ALLOWED_MENTIONS = {"parse": [], "roles": [ROLE_ID] if ROLE_ID else []}
 
 TZ = ZoneInfo("Asia/Kolkata")
 FF_TZ = ZoneInfo("America/New_York")  # the feed's native timezone
 STATE_FILE = "state.json"
 
-MIN_AHEAD = 2    # minutes
-MAX_AHEAD = 15   # minutes
-FEED_MAX_AGE_HOURS = 6
+MIN_AHEAD = 1    # minutes
+MAX_AHEAD = 20   # minutes (wide window: GitHub cron runs are often delayed)
+FEED_MAX_AGE_HOURS = 3
 
 ICON = {"High": "🔴"}
 COLOR = {"High": 0xE74C3C}
@@ -37,6 +42,23 @@ def save_state(state):
         json.dump(state, f)
 
 
+def fetch_json(url, attempts=4):
+    """Fetch the FF feed with retries (the feed often returns 429/5xx to shared GitHub runners)."""
+    last = None
+    for i in range(attempts):
+        try:
+            r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
+            if r.status_code == 429 or r.status_code >= 500:
+                raise RuntimeError(f"HTTP {r.status_code}")
+            r.raise_for_status()
+            return r.json()
+        except Exception as ex:
+            last = ex
+            print(f"Feed fetch attempt {i + 1}/{attempts} failed: {ex}", file=sys.stderr)
+            time.sleep(5 * (i + 1))
+    raise last
+
+
 def get_feed(state, now):
     fetched = state.get("feed_fetched")
     if fetched and state.get("feed"):
@@ -44,9 +66,7 @@ def get_feed(state, now):
         if age < timedelta(hours=FEED_MAX_AGE_HOURS):
             return state["feed"]
     try:
-        r = requests.get(FEED, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
-        r.raise_for_status()
-        state["feed"] = r.json()
+        state["feed"] = fetch_json(FEED)
         state["feed_fetched"] = now.isoformat()
     except Exception as ex:
         if state.get("feed"):
@@ -86,6 +106,7 @@ def main():
         if MIN_AHEAD <= mins <= MAX_AHEAD and event_id(e) not in state["sent"]:
             due.append((dt, mins, e))
 
+    print(f"{len(due)} alert(s) due in the next {MAX_AHEAD} min.")
     if not due:
         save_state(state)
         return
@@ -116,9 +137,9 @@ def main():
             "footer": {"text": "Source: Forex Factory"},
         })
 
-    payload = {"embeds": embeds[:10]}
-    if PING and has_high:
-        payload["content"] = PING
+    payload = {"embeds": embeds[:10], "allowed_mentions": ALLOWED_MENTIONS}
+    if ROLE_MENTION:
+        payload["content"] = ROLE_MENTION
 
     r = requests.post(WEBHOOK, json=payload, timeout=20)
     r.raise_for_status()
