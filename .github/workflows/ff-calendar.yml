@@ -18,6 +18,6 @@ jobs:
       - name: Run
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          PING_ROLE_ID: ${{ vars.PING_ROLE_ID }}
+          PING_ROLE_ID: ${{ secrets.PING_ROLE_ID }}
           MODE: ${{ github.event.schedule == '30 1 * * 0' && 'week' || 'today' }}
         run: python ff_calendar.py

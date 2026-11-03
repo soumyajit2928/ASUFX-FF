@@ -27,7 +27,7 @@ jobs:
       - name: Check for upcoming news
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          PING_ROLE_ID: ${{ vars.PING_ROLE_ID }}
+          PING_ROLE_ID: ${{ secrets.PING_ROLE_ID }}
         run: python ff_alerts.py
 
       - name: Save state
